@@ -1,18 +1,12 @@
 #!/usr/bin/python3
 
+import os
+import argparse
 import urllib, sys, re
 from urllib.parse import urlparse
 import urllib.request
 import ssl
 from multiprocessing.dummy import Pool as ThreadPool
-
-def print_c():
-	print("           _     _")
-	print(" ___ ___ _| |___| |_ _ _ ___ ___ ___")
-	print("|  _| . | . | -_| . | | |- _| -_|   |")
-	print("|___|___|___|___|___|_  |___|___|_|_|")
-	print("     https://dsda.ru|___|")
-	print()
 
 def getFile(filename):
 	try:
@@ -20,8 +14,33 @@ def getFile(filename):
 			return f.read().split("\n")
 	except IOError as e:
 		print("> "+e.strerror+" ["+e.filename+"]")
+		parser.print_usage()
 
-		
+
+def parse_inline_domains(domainstr):
+	return domainstr.split(",")
+# help title
+parser = argparse.ArgumentParser(
+	prog='./domainchecker.py',
+	formatter_class=argparse.RawDescriptionHelpFormatter,
+	description='''\
+	           _     _
+	 ___ ___ _| |___| |_ _ _ ___ ___ ___
+	|  _| . | . | -_| . | | |- _| -_|   |
+	|___|___|___|___|___|_  |___|___|_|_|
+	     https://dsda.ru|___|
+ ''')
+parser.add_argument('-l', dest="list", type=getFile, help='domain list file (each domain from new line)') 
+parser.add_argument('-d', dest="domains", type=parse_inline_domains, help='domain list string (separates by ",")') 
+parser.add_argument('-c', dest="codes", action='store_true', help='return [return code] domain name') 
+parser.add_argument('-g', dest="good", action='store_true', help='return only good domains') 
+parser.add_argument('-o', dest="output", type=argparse.FileType('w'), help='file to write result') 
+
+if len(sys.argv)<=1:
+    parser.print_usage(sys.stderr)
+    sys.exit(1)
+args = parser.parse_args()
+print(args)
 
 def cleanlist(dList):
 	dpList = []
@@ -51,33 +70,31 @@ def tryConnect(url):
 		ret = e.code
 	except urllib.error.URLError as e:
 		if hasattr(e, 'reason'):
-			ret = e.reason
+			ret = e.reason.errno
 		elif hasattr(e, 'code'):
 			ret = e.code
 		else:
 			ret = 'unknown error'
 	except ConnectionResetError as e:
 		ret = e
-	return str(ret) + "\t" + url
+	ret_str = ''
+	if args.codes==True:
+		ret_str = str(ret) + "\t"
+	ret_str = ret_str + url
+	#TODO: check for return codes
+	if (ret!=8 and ret!=500 and ret!=404):
+		return ret_str
+	else:
+		if args.good!=True:
+			return ret_str
+	
 
 
 # count the arguments
-arguments = len(sys.argv)
-if (arguments>=3 and sys.argv[1]=='-f'):
-	domains = getFile(sys.argv[2])
+if (args.list == None):
+	domains = args.domains
 else:
-	domains = sys.argv[1:arguments]
-
-if not domains:
-	print_c()
-	print('> Whereis domains?')
-	print()
-	print("Usage:")
-	print("\t ./domainchecker.py -f list.txt")
-	print("\t\t or")
-	print("\t ./domainchecker.py google.com")
-	print()
-	exit()
+	domains = args.list
 
 domains = cleanlist(domains)
 
@@ -85,5 +102,10 @@ domains = cleanlist(domains)
 pool = ThreadPool(8)
 results = pool.map(tryConnect, domains)
 
+
 for i in results:
-	print(i)
+	if i!=None:
+		if args.output:
+			args.output.write(i+os.linesep)
+		else:
+			print(i)
