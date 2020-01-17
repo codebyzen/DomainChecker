@@ -6,12 +6,22 @@ import urllib.request
 import ssl
 from multiprocessing.dummy import Pool as ThreadPool
 
+def print_c():
+	print("           _     _")
+	print(" ___ ___ _| |___| |_ _ _ ___ ___ ___")
+	print("|  _| . | . | -_| . | | |- _| -_|   |")
+	print("|___|___|___|___|___|_  |___|___|_|_|")
+	print("     https://dsda.ru|___|")
+	print()
 
 def getFile(filename):
-	f = open(filename, "r")
-	domains = f.read().split("\n")
-	return domains
+	try:
+		with open(filename, "r") as f:
+			return f.read().split("\n")
+	except IOError as e:
+		print("> "+e.strerror+" ["+e.filename+"]")
 
+		
 
 def cleanlist(dList):
 	dpList = []
@@ -57,6 +67,17 @@ if (arguments>=3 and sys.argv[1]=='-f'):
 	domains = getFile(sys.argv[2])
 else:
 	domains = sys.argv[1:arguments]
+
+if not domains:
+	print_c()
+	print('> Whereis domains?')
+	print()
+	print("Usage:")
+	print("\t ./domainchecker.py -f list.txt")
+	print("\t\t or")
+	print("\t ./domainchecker.py google.com")
+	print()
+	exit()
 
 domains = cleanlist(domains)
 
