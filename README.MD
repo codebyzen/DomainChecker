@@ -12,7 +12,3 @@ Simple multithreading Python script to check domain for working web server on it
 ./domainchecker.py -f domains.txt
 
 To deactivate VirtualEnv type `deactivate`
-
-TODO
-----
-Parse data from [crt.sh](https://crt.sh/)
