@@ -4,8 +4,8 @@ Domain Checker
 A multi-threaded python script to determine site availability.
 
 #### Install ####
-- git clone [https://github.com/codebyzen/DomainChecker](https://github.com/codebyzen/DomainChecker)
-- chmod +x ./domainchecker.py
+- `git clone https://github.com/codebyzen/DomainChecker`
+- `chmod +x ./domainchecker.py`
 
 #### Usage ####
 usage: `./domainchecker.py [-h] [-l LIST] [-d DOMAINS] [-crt] [-c] [-g] [-o OUTPUT]`
