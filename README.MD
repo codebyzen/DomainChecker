@@ -19,5 +19,3 @@ optional arguments:
   -g          return only good domains
   -o OUTPUT   file to write result
 ```
-
-To deactivate VirtualEnv type `deactivate`
