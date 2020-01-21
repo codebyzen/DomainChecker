@@ -1,12 +1,11 @@
 Domain Checker
 ==============
 
-Simple multithreading Python script to check domain for working web server on it.
+A multi-threaded python script to determine site availability.
 
 #### Install ####
-- clone git repo
-- python3 -m venv venv
-- source ./venv/bin/activate
+- git clone [https://github.com/codebyzen/DomainChecker](https://github.com/codebyzen/DomainChecker)
+- chmod +x ./domainchecker.py
 
 #### Usage ####
 usage: `./domainchecker.py [-h] [-l LIST] [-d DOMAINS] [-crt] [-c] [-g] [-o OUTPUT]`
