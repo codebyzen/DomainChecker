@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-
+import http
+from http.client import RemoteDisconnected
 from pprint import pprint
 import argparse
 import json
@@ -12,6 +13,7 @@ import sys
 import urllib
 import urllib.request
 from multiprocessing.dummy import Pool as ThreadPool
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 
 
@@ -42,6 +44,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-l', dest="list", type=get_file, help='domain list file (each domain from new line)')
 parser.add_argument('-d', dest="domains", type=parse_inline_domains, help='domain list string (separates by ",")')
 parser.add_argument('-crt', dest="crt", action='store_true', help='get additional domains from crt.sh')
+parser.add_argument('-crto', dest="crto", type=argparse.FileType('w'), help='save all domains from crt.sh')
 parser.add_argument('-c', dest="codes", action='store_true', help='return [return code] domain name')
 parser.add_argument('-g', dest="good", action='store_true', help='return only good domains')
 parser.add_argument('-o', dest="output", type=argparse.FileType('w'), help='file to write result')
@@ -50,8 +53,6 @@ if len(sys.argv) <= 1:
 	parser.print_usage(sys.stderr)
 	sys.exit(1)
 args = parser.parse_args()
-
-print(args)
 
 
 def get_data_from_crt(domain):
@@ -74,20 +75,18 @@ def get_data_from_crt(domain):
 		print("Fetch domains from crt.sh...")
 		with urllib.request.urlopen("https://crt.sh", data, context=ctx) as f:
 			raw = f.read().decode('utf-8')
-	except urllib.error.HTTPError as e:
-		ret = e.code
-	except urllib.error.URLError as e:
-		if hasattr(e, 'reason'):
-			ret = e.reason.errno
-		elif hasattr(e, 'code'):
-			ret = e.code
+	except HTTPError as e:
+		ret = "HTTPError >> " + e.reason
+	except URLError as e:
+		if isinstance(e.reason, socket.gaierror):
+			ret = "GAIError >> " + str(e.reason.errno) + " " + e.reason.strerror
 		else:
-			ret = 'unknown error'
-	except ConnectionResetError as e:
-		ret = e
+			ret = "URLError >> " + e.reason
+	except socket.timeout:
+		ret = "TIMEOUT"
 
 	if ret:
-		print("Sorry crt.sh return %ds@ try use proxy or try later..." % ret)
+		print("Sorry crt.sh return " + str(ret) + " try use proxy or try later...")
 		exit(-1)
 
 	output = json.loads(raw)
@@ -107,6 +106,11 @@ def get_data_from_crt(domain):
 	list_set = set(clean_domains)
 	# convert the set to the list
 	clean_domains = (list(list_set))
+
+	if args.crto:
+		for clean_domains_item in clean_domains:
+			args.crto.write('%s\n' % clean_domains_item)
+			# args.crto.write(clean_domains + os.linesep)
 
 	return clean_domains
 
@@ -138,7 +142,7 @@ def try_connect(item_arr):
 	number = item_arr[0]
 	url: str = item_arr[1]
 	sys.stdout.write("\033[K")
-	print("\r>> Now we get {}".format(number), end='')
+	print("\r>> Now we get %d %s (%d) \t" % (number, url, len(url)), end='')
 	ctx = ssl.create_default_context()
 	ctx.check_hostname = False
 	ctx.verify_mode = ssl.CERT_NONE
@@ -147,13 +151,19 @@ def try_connect(item_arr):
 		with urllib.request.urlopen(url, timeout=3, context=ctx) as f:
 			ret = f.code
 			domain_flag = True
-	except urllib.error.HTTPError as e:
+	except HTTPError as e:
 		ret = "HTTPError >> " + e.reason
-	except urllib.error.URLError as e:
-		if isinstance(e.reason, socket.gaierror):
-			ret = "GAIError >> " + e.reason.strerror
+	except RemoteDisconnected as e:
+		ret = "RemoteDisconnected >> "
+	except URLError as e:
+		if isinstance(e.reason, socket.timeout):
+			ret = "TIMEOUT >> "
+		elif isinstance(e.reason, socket.gaierror):
+			ret = "GAIError >> " + str(e.reason.errno) + " " + e.reason.strerror
 		else:
 			ret = "URLError >> " + e.reason
+	except socket.timeout:
+		ret = "TIMEOUT >>"
 
 	ret_str = url
 
@@ -183,6 +193,12 @@ if args.crt:
 
 domains = clean_list(domains)
 print("Total %d domain(s)" % len(domains))
+
+# results = []
+# for domain in domains:
+# 	pprint(try_connect(domain))
+#
+# exit()
 
 pool = ThreadPool(multiprocessing.cpu_count())
 results = pool.map(try_connect, domains)
