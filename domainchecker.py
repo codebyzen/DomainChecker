@@ -45,10 +45,10 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-l', dest="list", type=get_file, help='domain list file (each domain from new line)')
 parser.add_argument('-d', dest="domains", type=parse_inline_domains, help='domain list string (separates by ",")')
 parser.add_argument('-crt', dest="crt", action='store_true', help='get additional domains from crt.sh')
-parser.add_argument('-crto', dest="crto", type=argparse.FileType('w'), help='save all domains from crt.sh')
+parser.add_argument('-crto', dest="crt_log_file", type=argparse.FileType('w'), help='save all domains from crt.sh')
 parser.add_argument('-c', dest="codes", action='store_true', help='return [return code] domain name')
 parser.add_argument('-g', dest="good", action='store_true', help='return only good domains')
-parser.add_argument('-o', dest="output", type=argparse.FileType('w'), help='file to write result')
+parser.add_argument('-o', dest="log_file", type=argparse.FileType('w'), help='file to write result')
 
 if len(sys.argv) <= 1:
 	parser.print_usage(sys.stderr)
@@ -90,9 +90,9 @@ def get_data_from_crt(domain):
 		print("Sorry crt.sh return " + str(ret) + " try use proxy or try later...")
 		exit(-1)
 
-	output = json.loads(raw)
+	json_data = json.loads(raw)
 	urls_array = []
-	for i in output:
+	for i in json_data:
 		if i['name_value']:
 			url = i['name_value'].split("\n")
 			# url = i['name_value']
@@ -108,10 +108,10 @@ def get_data_from_crt(domain):
 	# convert the set to the list
 	clean_domains = (list(list_set))
 
-	if args.crto:
+	if args.crt_log_file:
 		for clean_domains_item in clean_domains:
-			args.crto.write('%s\n' % clean_domains_item)
-			# args.crto.write(clean_domains + os.linesep)
+			args.crt_log_file.write('%s\n' % clean_domains_item)
+			# args.crt_log_file.write(clean_domains + os.linesep)
 
 	return clean_domains
 
@@ -152,6 +152,8 @@ def try_connect(item_arr):
 		with urllib.request.urlopen(url, timeout=3, context=ctx) as f:
 			ret = f.code
 			domain_flag = True
+	except UnicodeError as e:
+		ret = "TooLong Domain >> " + url
 	except HTTPError as e:
 		ret = "HTTPError >> " + e.reason
 	except RemoteDisconnected as e:
@@ -159,6 +161,8 @@ def try_connect(item_arr):
 	except URLError as e:
 		if isinstance(e.reason, socket.timeout):
 			ret = "TIMEOUT >> "
+		# elif isinstance(e.reason, socket.ConnectionRefusedError):
+		# 	ret = "ConnectionRefusedError >> "
 		elif isinstance(e.reason, socket.gaierror):
 			ret = "GAIError >> " + str(e.reason.errno) + " " + e.reason.strerror
 		else:
@@ -207,7 +211,7 @@ results = pool.map(try_connect, domains)
 print("")
 for i in results:
 	if i is not None and i is not False:
-		if args.output:
-			args.output.write(i + os.linesep)
+		if args.log_file:
+			args.log_file.write(i + os.linesep)
 		else:
 			print(i)
