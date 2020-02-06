@@ -16,6 +16,22 @@ import urllib.request
 from multiprocessing.dummy import Pool as ThreadPool
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from time import sleep
+
+
+def progressbar(width,min,max,current,text=""):
+	hashcount = int(current/((max-min)/width))
+	fmt = "[%-"+str(width)+"s]"
+	sys.stdout.write("\r")
+	sys.stdout.write("\033[K")
+	sys.stdout.write(fmt % ('#'*hashcount))
+	sys.stdout.write("\n")
+	sys.stdout.write("\033[K")
+	sys.stdout.write(text)
+	sys.stdout.write("\033[1A")
+	sys.stdout.write("\r")
+	sys.stdout.flush()
+
 
 
 def get_file(filename):
@@ -142,8 +158,8 @@ def clean_list(domains_list):
 def try_connect(item_arr):
 	number = item_arr[0]
 	url: str = item_arr[1]
-	sys.stdout.write("\033[K")
-	print("\r>> Now we get %d %s (%d) \t" % (number, url, len(url)), end='')
+	# sys.stdout.write("\033[K")
+	# print("\r>> Now we get %d %s (%d) \t" % (number, url, len(url)), end='')
 	ctx = ssl.create_default_context()
 	ctx.check_hostname = False
 	ctx.verify_mode = ssl.CERT_NONE
@@ -199,16 +215,21 @@ if args.crt:
 domains = clean_list(domains)
 print("Total %d domain(s)" % len(domains))
 
-# results = []
-# for domain in domains:
-# 	pprint(try_connect(domain))
-#
-# exit()
+curr_i = 0
+results = []
+for domain in domains:
+	result = try_connect(domain)
+	progressbar(50,1,len(domains),curr_i,'Hello '+str(domain + results))
+	curr_i=curr_i+1
+
+exit()
 
 pool = ThreadPool(multiprocessing.cpu_count())
 results = pool.map(try_connect, domains)
+	
 
 print("")
+
 for i in results:
 	if i is not None and i is not False:
 		if args.log_file:
