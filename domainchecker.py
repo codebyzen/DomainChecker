@@ -1,8 +1,6 @@
 #!/usr/bin/python3
 
-import http
 from http.client import RemoteDisconnected
-from pprint import pprint
 import argparse
 import json
 import multiprocessing
@@ -13,25 +11,22 @@ import ssl
 import sys
 import urllib
 import urllib.request
-from multiprocessing.dummy import Pool as ThreadPool
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from time import sleep
 
 
-def progressbar(width,min,max,current,text=""):
-	hashcount = int(current/((max-min)/width))
-	fmt = "[%-"+str(width)+"s]"
+def progressbar(width, _min, _max, current, text=""):
+	hashes = int(current / ((_max - _min) / width))
+	fmt = "[%-" + str(width) + "s]"
 	sys.stdout.write("\r")
 	sys.stdout.write("\033[K")
-	sys.stdout.write(fmt % ('#'*hashcount))
+	sys.stdout.write(fmt % ('#' * hashes))
 	sys.stdout.write("\n")
 	sys.stdout.write("\033[K")
 	sys.stdout.write(text)
 	sys.stdout.write("\033[1A")
 	sys.stdout.write("\r")
 	sys.stdout.flush()
-
 
 
 def get_file(filename):
@@ -43,8 +38,8 @@ def get_file(filename):
 		parser.print_usage()
 
 
-def parse_inline_domains(domainstr):
-	return domainstr.split(",")
+def parse_inline_domains(urls):
+	return urls.split(",")
 
 
 # help title
@@ -72,13 +67,13 @@ if len(sys.argv) <= 1:
 args = parser.parse_args()
 
 
-def get_data_from_crt(domain):
+def get_data_from_crt(_domain):
 	ctx = ssl.create_default_context()
 	ctx.check_hostname = False
 	ctx.verify_mode = ssl.CERT_NONE
 	ctx.ua = 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1'
 
-	domain_name = domain.strip()
+	domain_name = _domain.strip()
 	matches = re.search("http[s]?:\/\/", domain_name)
 	if matches is not None:
 		purl = urlparse(domain_name)
@@ -111,7 +106,6 @@ def get_data_from_crt(domain):
 	for i in json_data:
 		if i['name_value']:
 			url = i['name_value'].split("\n")
-			# url = i['name_value']
 			urls_array = urls_array + url
 
 	clean_domains = []
@@ -127,7 +121,6 @@ def get_data_from_crt(domain):
 	if args.crt_log_file:
 		for clean_domains_item in clean_domains:
 			args.crt_log_file.write('%s\n' % clean_domains_item)
-			# args.crt_log_file.write(clean_domains + os.linesep)
 
 	return clean_domains
 
@@ -147,19 +140,15 @@ def clean_list(domains_list):
 			dp_list.append(purl.scheme + "://" + purl.netloc)
 	my_set = set(dp_list)
 	dp_list = list(my_set)
-	ret_list = []
-	items_counter = 1
-	for item in dp_list:
-		ret_list.append([items_counter, item])
-		items_counter = items_counter + 1
-	return ret_list
+	# ret_list = []
+	# items_counter = 1
+	# for item in dp_list:
+	# 	ret_list.append([items_counter, item])
+	# 	items_counter = items_counter + 1
+	return dp_list
 
 
-def try_connect(item_arr):
-	number = item_arr[0]
-	url: str = item_arr[1]
-	# sys.stdout.write("\033[K")
-	# print("\r>> Now we get %d %s (%d) \t" % (number, url, len(url)), end='')
+def try_connect(url, number):
 	ctx = ssl.create_default_context()
 	ctx.check_hostname = False
 	ctx.verify_mode = ssl.CERT_NONE
@@ -193,11 +182,11 @@ def try_connect(item_arr):
 
 	if args.good:
 		if domain_flag:
-			return ret_str
+			return number, ret_str
 		else:
-			return False
+			return number, False
 
-	return ret_str
+	return number, ret_str
 
 
 # count the arguments
@@ -212,25 +201,25 @@ if args.crt:
 		all_domains = all_domains + get_data_from_crt(i)
 	domains = all_domains
 
+print("CPU count: " + str(multiprocessing.cpu_count()))
 domains = clean_list(domains)
 print("Total %d domain(s)" % len(domains))
 
-curr_i = 0
-results = []
-for domain in domains:
-	result = try_connect(domain)
-	progressbar(50,1,len(domains),curr_i,'Hello '+str(domain + results))
-	curr_i=curr_i+1
 
-exit()
+def update(i):
+	progressbar(40, 0, len(domains), i[0], text=str(i))
+	# note: input comes from async `try_connect`
+	res[i[0]] = i[1]  # put answer into correct index of result list
 
-pool = ThreadPool(multiprocessing.cpu_count())
-results = pool.map(try_connect, domains)
-	
 
-print("")
+res = [None] * len(domains)
+pool = multiprocessing.Pool(multiprocessing.cpu_count() + 1)
+for domain, iter in zip(domains, range(len(domains))):
+	pool.apply_async(try_connect, args=(domain, iter,), callback=update)
+pool.close()
+pool.join()
 
-for i in results:
+for i in res:
 	if i is not None and i is not False:
 		if args.log_file:
 			args.log_file.write(i + os.linesep)
